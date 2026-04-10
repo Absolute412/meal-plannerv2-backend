@@ -31,7 +31,7 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 
     # Create user object
     new_user = User(
-        email=user.email,
+        email=user.email.strip().lower(),
         username=user.username.strip().lower(),
         hashed_password=hashed_pw
     )
@@ -108,7 +108,7 @@ def update_profile(
 
     # Update username
     if updates.username:
-        formatted_username = updates.username.strip().capitalize()
+        formatted_username = updates.username.strip().lower()
         if not formatted_username:
             raise HTTPException(status_code=400, detail="Username cannot be empty")
         existing_username = db.query(User).filter(User.username == formatted_username).first()
