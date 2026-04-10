@@ -32,7 +32,7 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     # Create user object
     new_user = User(
         email=user.email,
-        username=user.username.strip().capitalize(),
+        username=user.username.strip().lower(),
         hashed_password=hashed_pw
     )
 
@@ -53,7 +53,10 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session =Depends
     """
     # Find user by email or username
     user = db.query(User).filter(
-        or_(User.email == form_data.username, User.username == form_data.username)
+        or_(
+            User.email == form_data.username.lower(),
+            User.username == form_data.username.strip().lower()
+        )
     ).first()
 
     if not user:
