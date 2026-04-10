@@ -10,24 +10,30 @@ def create_meal(db: Session, meal: MealCreate, user_id: int):
         meal_date=meal.meal_date or date.today(),
         user_id=user_id
     )
+
     db.add(db_meal)
-    db.commit()
-    db.refresh(db_meal)
+    db.flush()  # gets ID without commiting
 
     # save ingredients
     if meal.ingredients:
+        ingredients = []
+
         for ing in meal.ingredients:
             name = (ing.name or "").strip()
             if not name:
                 continue
-            db.add(models.Ingredient(
+
+            ingredients.append(models.Ingredient(
                 meal_id = db_meal.id,
                 name = name,
                 measure = (ing.measure or "").strip()
             ))
-        db.commit()
-        db.refresh(db_meal)
 
+        db.add_all(ingredients)
+
+    db.commit()
+    db.refresh(db_meal)
+    
     return db_meal
 
 def update_meal(db: Session, meal_id: int, meal: MealUpdate, user_id: int):

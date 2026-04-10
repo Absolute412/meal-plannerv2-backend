@@ -69,9 +69,21 @@ def add_groceries(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
     added = []
     skipped = []
+
+    # get all existing groceries ONCE
+    existing_items = db.query(Grocery).filter(
+        Grocery.user_id == current_user.id
+    ).all()
+
+    existing_set = {
+        (g.name.lower().strip(), (g.measure or "").lower().strip())
+        for g in existing_items
+    }
+
+    # prepare new items
+    new_objects = []
 
     for item in items:
         name = (item.name or "").strip()
@@ -80,33 +92,36 @@ def add_groceries(
         if not name:
             skipped.append({"name": name, "measure": measure, "reason": "empty_name"})
             continue
-        # print("current_user.id:", current_user.id)
 
+        key = (name.lower(), measure.lower())
 
-        grocery = Grocery(name=name, measure=measure, user_id=current_user.id)
-        db.add(grocery)
+        if key in existing_set:
+            skipped.append({"name": name, "measure": measure, "reason": "duplicate"})
+            continue
 
-        try:
-            db.commit()
-            db.refresh(grocery)
-            added.append(grocery)
-        except IntegrityError as e:
-            db.rollback()
-            # print("IntegrityError:", e)
+        existing_set.add(key)  # prevent duplicates within same request
 
-            pgcode = getattr(e.orig, "pgcode", None)
-            if pgcode == "23505":
-                skipped.append({"name": name, "measure": measure, "reason": "duplicate"})
-            else:
-                raise HTTPException(status_code=500, detail="Could not add grocery")
+        new_objects.append(
+            Grocery(
+                name=name,
+                measure=measure,
+                user_id=current_user.id
+            )
+        )
+
+    # bulk insert (FAST)
+    if new_objects:
+        db.add_all(new_objects)
+        db.commit()
+        added = new_objects
 
     return {
-        "message": "Groceries added",
-         "items_added": jsonable_encoder(added),
-         "items_skipped": skipped,
-         "added_count": len(added),
-         "skipped_count": len(skipped),
-        }
+        "message": "Groceries processed",
+        "items_added": jsonable_encoder(added),
+        "items_skipped": skipped,
+        "added_count": len(added),
+        "skipped_count": len(skipped),
+    }
 
 @router.delete("/{item_id}")
 def delete_grocery(
