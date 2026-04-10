@@ -87,7 +87,7 @@ class ProfileUpdate(BaseModel):
     def validate_username(cls, v):
         if v is None:
             return v
-        if not v.strip():
+        if not isinstance(v, str) and v.strip():
             raise ValueError("Username cannot be empty")
         return v
 
