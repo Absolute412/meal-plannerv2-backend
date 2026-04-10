@@ -16,13 +16,20 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post("/signup", response_model=UserResponse)
 def signup(user: UserCreate, db: Session = Depends(get_db)):
 
-    # Check if email already exists
-    existing_user = db.query(User).filter(User.email == user.email).first()
+    #  Normalize first
+    email = user.email.strip().lower()
+    username = user.username.strip().lower()
+
+    # Validate empty after stripping
+    if not email or not username:
+        raise HTTPException(status_code=400, detail="Email and username cannot be empty")
+
+    # Check duplicate using normalized values
+    existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Check if username already exists
-    existing_username = db.query(User).filter(User.username == user.username).first()
+    existing_username = db.query(User).filter(User.username == username).first()
     if existing_username:
         raise HTTPException(status_code=400, detail="Username already registered")
     
@@ -31,8 +38,8 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 
     # Create user object
     new_user = User(
-        email=user.email.strip().lower(),
-        username=user.username.strip().lower(),
+        email=email,
+        username=username,
         hashed_password=hashed_pw
     )
 
@@ -52,10 +59,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session =Depends
     form_data.password → plain password
     """
     # Find user by email or username
+    identifier = form_data.username.strip().lower()
+
     user = db.query(User).filter(
         or_(
-            User.email == form_data.username.lower(),
-            User.username == form_data.username.strip().lower()
+            User.email == identifier,
+            User.username == identifier
         )
     ).first()
 
@@ -104,13 +113,15 @@ def update_profile(
         existing_email = db.query(User).filter(User.email == updates.email).first()
         if existing_email and existing_email.id != current_user.id:
             raise HTTPException(status_code=400, detail="Email already in use")
-        current_user.email = updates.email
+        current_user.email = updates.email.strip().lower()
 
     # Update username
     if updates.username:
-        formatted_username = updates.username.strip().lower()
-        if not formatted_username:
+        clean = updates.username.strip()
+        if not clean:
             raise HTTPException(status_code=400, detail="Username cannot be empty")
+        
+        formatted_username = clean.lower()
         existing_username = db.query(User).filter(User.username == formatted_username).first()
         if existing_username and existing_username.id != current_user.id:
             raise HTTPException(status_code=400, detail="Username already in use")
@@ -131,13 +142,15 @@ def update_password(
     # Verify current password
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
-    if data.current_password == data.new_password:
+    if data.current_password.strip() == data.new_password.strip():
         raise HTTPException(status_code=400, detail="New password must be different")
     
     # Hash new password
     new_hashed_password = hash_password(data.new_password)
     current_user.hashed_password = new_hashed_password
 
+    db.add(current_user)
     db.commit()
+    db.refresh(current_user)
 
     return {"message": "Password updated successfully"}

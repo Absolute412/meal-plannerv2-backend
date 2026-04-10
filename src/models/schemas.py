@@ -56,6 +56,14 @@ class UserCreate(BaseModel):
     username: str
     password: str
 
+    @field_validator("email")
+    def normalize_email(cls, v):
+        return v.strip().lower()
+    
+    @field_validator("username")
+    def normalize_username(cls, v):
+        return v.strip().lower()
+
     @field_validator("password")    
     def validate_password(cls, v):
         if len(v) < 8:
@@ -87,7 +95,7 @@ class ProfileUpdate(BaseModel):
     def validate_username(cls, v):
         if v is None:
             return v
-        if not isinstance(v, str) and v.strip():
+        if not isinstance(v, str) or not v.strip():
             raise ValueError("Username cannot be empty")
         return v
 
