@@ -88,8 +88,8 @@ class UserResponse(BaseModel):
 
 # User Profile
 class ProfileUpdate(BaseModel):
-    email: Optional[EmailStr]
-    username: Optional[str]
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
 
     @field_validator("username")
     def validate_username(cls, v):
